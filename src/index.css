@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --font-courier: "Courier New", Courier, monospace;
+  
+  --shadow-clay: 16px 16px 32px rgba(0, 0, 0, 0.08), inset -8px -8px 12px rgba(0, 0, 0, 0.05), inset 8px 8px 12px rgba(255, 255, 255, 0.8);
+  --shadow-clay-hover: 20px 20px 40px rgba(0, 0, 0, 0.12), inset -10px -10px 15px rgba(0, 0, 0, 0.08), inset 10px 10px 15px rgba(255, 255, 255, 0.9);
+  --shadow-clay-btn: 8px 8px 16px rgba(0, 0, 0, 0.1), inset -4px -4px 6px rgba(0, 0, 0, 0.1), inset 4px 4px 6px rgba(255, 255, 255, 0.5);
+  --shadow-clay-btn-active: 4px 4px 8px rgba(0, 0, 0, 0.1), inset -2px -2px 4px rgba(0, 0, 0, 0.1), inset 2px 2px 4px rgba(255, 255, 255, 0.5);
+}
+
+@utility clay-card {
+  background-color: white;
+  border-radius: 2.5rem;
+  box-shadow: var(--shadow-clay);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+@utility clay-badge {
+  background-color: white;
+  border-radius: 1rem;
+  box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.05), inset -2px -2px 4px rgba(0, 0, 0, 0.05), inset 2px 2px 4px rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+@utility clay-btn-indigo {
+  background-color: #6366f1;
+  color: white;
+  border-radius: 1.5rem;
+  box-shadow: 8px 8px 16px rgba(99, 102, 241, 0.2), inset -4px -4px 6px rgba(0, 0, 0, 0.2), inset 4px 4px 6px rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+@utility clay-btn-emerald {
+  background-color: #10b981;
+  color: white;
+  border-radius: 1.5rem;
+  box-shadow: 8px 8px 16px rgba(16, 185, 129, 0.2), inset -4px -4px 6px rgba(0, 0, 0, 0.2), inset 4px 4px 6px rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+@utility clay-btn-amber {
+  background-color: #f59e0b;
+  color: white;
+  border-radius: 1.5rem;
+  box-shadow: 8px 8px 16px rgba(245, 158, 11, 0.2), inset -4px -4px 6px rgba(0, 0, 0, 0.2), inset 4px 4px 6px rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+@utility clay-btn-red {
+  background-color: #ef4444;
+  color: white;
+  border-radius: 1.5rem;
+  box-shadow: 8px 8px 16px rgba(239, 68, 68, 0.2), inset -4px -4px 6px rgba(0, 0, 0, 0.2), inset 4px 4px 6px rgba(255, 255, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+@utility clay-btn-white {
+  background-color: white;
+  color: #4b5563;
+  border-radius: 1.5rem;
+  box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.05), inset -4px -4px 6px rgba(0, 0, 0, 0.05), inset 4px 4px 6px rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}

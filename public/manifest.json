@@ -1,0 +1,16 @@
+{
+  "name": "VocabRunner",
+  "short_name": "VocabRunner",
+  "description": "A powerful vocabulary learning app with offline support.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ]
+}
