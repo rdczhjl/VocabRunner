@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
+    "build-cert": "mkcert -key-file key.pem -cert-file cert.pem localhost 127.0.0.1 ::1",
     "lint": "tsc --noEmit",
     "start": "node server.ts"
   },

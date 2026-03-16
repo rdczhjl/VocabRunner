@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# VocabRunner 3.7
+# VocabRunner 3.21
 
 A powerful vocabulary learning app with offline support and cloud sync.
 
@@ -87,7 +87,11 @@ View your app in AI Studio: https://ai.studio/apps/a8637214-5338-49ff-835c-3c668
 本应用已内置双服务器支持：HTTP (3000端口) 和 HTTPS (3443端口)。
 
 1.  **安装 mkcert**：在您的服务器电脑上安装 [mkcert](https://github.com/FiloSottile/mkcert)。
-2.  **生成证书**：
+2.  **初始化根证书**：
+    在终端运行 `mkcert -install`。这会生成本地根 CA 并将其安装到您电脑的系统信任库中。
+3.  **找到根证书文件**：
+    运行 `mkcert -CAROOT`。该命令会输出根证书所在的目录路径。在该目录下找到 `rootCA.pem` 文件，这是您需要发送到手机端安装的文件。
+4.  **生成站点证书**：
     ```bash
     # 假设您的局域网 IP 是 192.168.1.100
     mkcert 192.168.1.100 localhost 127.0.0.1
@@ -102,6 +106,7 @@ View your app in AI Studio: https://ai.studio/apps/a8637214-5338-49ff-835c-3c668
 ### 3. 手机端配置（关键）
 1.  **安装根证书**：将 `mkcert` 生成的 `rootCA.pem` 发送到手机并安装。
     *   **iOS**: 设置 -> 已下载描述文件 -> 安装。然后前往：设置 -> 通用 -> 关于本机 -> 证书信任设置 -> 开启对 mkcert 根证书的**完全信任**。
+    *   **Android**: 设置 -> 安全 -> 更多安全设置 -> 加密与凭据 -> 安装证书 -> CA 证书。选择 `rootCA.pem` 并确认安装（不同品牌手机路径可能略有不同，建议直接在设置中搜索“CA 证书”）。
 2.  **访问应用**：使用 HTTPS 端口访问，例如 `https://192.168.1.100:3443`。
 3.  **安装 PWA**：
     *   **iOS**: 点击 Safari 分享按钮 -> “添加到主屏幕”。
