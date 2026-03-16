@@ -5,7 +5,9 @@ const ASSETS_TO_CACHE = [
   '/manifest.json',
   '/logo.png',
   '/icon.svg',
-  '/src/main.tsx'
+  '/src/main.tsx',
+  '/src/App.tsx',
+  '/src/index.css'
 ];
 
 self.addEventListener('install', (event) => {
@@ -43,9 +45,6 @@ self.addEventListener('fetch', (event) => {
 
   // 忽略 API 请求
   if (url.pathname.startsWith('/api/')) return;
-
-  // 忽略 Vite 的热更新请求 (@vite/client 等)
-  if (url.pathname.includes('@vite') || url.pathname.includes('node_modules')) return;
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
