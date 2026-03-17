@@ -71,6 +71,8 @@ export default function App() {
   const [testFeedback, setTestFeedback] = useState<'none' | 'correct' | 'incorrect'>('none');
   const [showHint, setShowHint] = useState<boolean>(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
+  const [pendingBook, setPendingBook] = useState<VocabularyBook | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [serverIp, setServerIp] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -266,7 +268,25 @@ export default function App() {
     fileInputRef.current?.click();
   };
 
+  // Helper to get display name (Requirement 3: only show part before first '_')
+  const getDisplayName = (name: string) => {
+    const index = name.indexOf('_');
+    return index === -1 ? name : name.substring(0, index);
+  };
+
   const processImportedData = (fileName: string, data: any[]) => {
+    let baseName = fileName.replace(/\.[^/.]+$/, "");
+    
+    // (2.1) Filename的第一个字符不可以是“_"
+    if (baseName.startsWith('_')) {
+      alert("文件名第一个字符不可以是 '_'");
+      return;
+    }
+
+    // (3) 如果文件名中有 "_"，则截断，只保留 "_" 以前的字符串
+    const underscoreIndex = baseName.indexOf('_');
+    const finalName = underscoreIndex === -1 ? baseName : baseName.substring(0, underscoreIndex);
+
     const words: Word[] = data.map((row, index) => {
       const wordText = row['单词'] || row['word'] || row[1] || '';
       if (!wordText) return null;
@@ -292,14 +312,42 @@ export default function App() {
     }
 
     const newBook: VocabularyBook = {
-      id: Date.now().toString(),
-      name: fileName.replace(/\.[^/.]+$/, ""),
+      id: finalName, // (1) 对应服务器上的 Filename.json
+      name: finalName, // (3) 下拉框显示的名称
       words: words,
     };
 
-    setBooks(prev => [...prev, newBook]);
-    setCurrentBookId(newBook.id);
-    storageService.saveBook(newBook);
+    // (2.2) 如果已经有相同名称的单词表,则提示用户是否覆盖已有单词表
+    const existingBook = books.find(b => b.id === newBook.id);
+    if (existingBook) {
+      setPendingBook(newBook);
+      setShowOverwriteConfirm(true);
+    } else {
+      saveNewBook(newBook);
+    }
+  };
+
+  const saveNewBook = (book: VocabularyBook) => {
+    setBooks(prev => {
+      // Remove existing book with same ID if any (for overwrite)
+      const filtered = prev.filter(b => b.id !== book.id);
+      return [...filtered, book];
+    });
+    setCurrentBookId(book.id);
+    storageService.saveBook(book);
+  };
+
+  const confirmOverwrite = () => {
+    if (pendingBook) {
+      saveNewBook(pendingBook);
+      setPendingBook(null);
+    }
+    setShowOverwriteConfirm(false);
+  };
+
+  const cancelOverwrite = () => {
+    setPendingBook(null);
+    setShowOverwriteConfirm(false);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -689,7 +737,7 @@ export default function App() {
                   className="w-full flex items-center justify-between clay-btn-indigo px-4 py-2 text-xs md:text-sm font-bold active:scale-95 transition-all"
                 >
                   <span className="truncate mr-2">
-                    {books.find(b => b.id === currentBookId)?.name || 'Select Book'}
+                    {books.find(b => b.id === currentBookId) ? getDisplayName(books.find(b => b.id === currentBookId)!.name) : 'Select Book'}
                   </span>
                   <motion.div
                     animate={{ rotate: isDropdownOpen ? 180 : 0 }}
@@ -719,7 +767,7 @@ export default function App() {
                             currentBookId === book.id ? 'text-indigo-600 bg-indigo-50/50' : 'text-gray-700'
                           }`}
                         >
-                          {book.name}
+                          {getDisplayName(book.name)}
                         </button>
                       ))}
                     </motion.div>
@@ -1099,7 +1147,45 @@ export default function App() {
         </div>
       </main>
 
-      {/* Custom Reset Confirmation Modal */}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#f0f2f5] text-gray-900 font-sans py-8 px-4">
+      {currentScreen === 'home' && renderHome()}
+      {currentScreen === 'learning' && renderLearning()}
+      {currentScreen === 'testing' && renderTesting()}
+      {currentScreen === 'settings' && renderSettings()}
+
+      {/* Global Modals */}
+      {showOverwriteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="clay-card p-10 max-w-sm w-full animate-in zoom-in-95 duration-200">
+            <div className="w-20 h-20 bg-amber-100 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-[inset_-4px_-4px_8px_rgba(0,0,0,0.05),inset_4px_4px_8px_rgba(255,255,255,0.8)]">
+              <Upload className="text-amber-600" size={36} />
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 text-center mb-3">覆盖已有单词表？</h3>
+            <p className="text-gray-500 text-center mb-10 font-medium leading-relaxed">
+              已经存在名为 "{pendingBook ? getDisplayName(pendingBook.name) : ''}" 的单词表。是否覆盖它？
+            </p>
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={confirmOverwrite}
+                className="w-full py-5 clay-btn-amber text-xl font-bold active:scale-95"
+              >
+                确定覆盖
+              </button>
+              <button
+                onClick={cancelOverwrite}
+                className="w-full py-5 clay-btn-white text-xl font-bold active:scale-95"
+              >
+                放弃
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showResetConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md animate-in fade-in duration-200">
           <div className="clay-card p-10 max-w-sm w-full animate-in zoom-in-95 duration-200">
@@ -1129,15 +1215,6 @@ export default function App() {
           </div>
         </div>
       )}
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-[#f0f2f5] text-gray-900 font-sans py-8 px-4">
-      {currentScreen === 'home' && renderHome()}
-      {currentScreen === 'learning' && renderLearning()}
-      {currentScreen === 'testing' && renderTesting()}
-      {currentScreen === 'settings' && renderSettings()}
     </div>
   );
 }

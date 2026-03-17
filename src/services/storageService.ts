@@ -12,21 +12,37 @@ export interface Word {
   lastTestedAt?: string;
   testSuccessCount?: number;
   testFailureCount?: number;
+  updatedAt?: number;
 }
 
 export interface VocabularyBook {
   id: string;
   name: string;
   words: Word[];
+  updatedAt?: number;
+  synced?: number;
 }
 
 class StorageService {
   private isOnline: boolean = true;
+  private syncInProgress: boolean = false;
 
   constructor() {
-    window.addEventListener('online', () => this.isOnline = true);
-    window.addEventListener('offline', () => this.isOnline = false);
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      console.log("App is online, triggering sync...");
+      this.syncPendingChanges();
+    });
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+      console.log("App is offline.");
+    });
     this.isOnline = navigator.onLine;
+    
+    // Initial sync check
+    if (this.isOnline) {
+      this.syncPendingChanges();
+    }
   }
 
   async getBooks(): Promise<VocabularyBook[]> {
@@ -37,8 +53,7 @@ class StorageService {
           const serverBooks: VocabularyBook[] = await res.json();
           if (Array.isArray(serverBooks)) {
             // Sync to local DB in background
-            this.syncToLocal(serverBooks);
-            return serverBooks;
+            await this.syncToLocal(serverBooks);
           }
         }
       }
@@ -58,7 +73,7 @@ class StorageService {
       const words = await db.words.where('bookId').equals(book.id).toArray();
       booksWithWords.push({
         ...book,
-        words: words.map(({ bookId, ...rest }) => rest as Word)
+        words: words.map(({ bookId, synced, ...rest }) => rest as Word)
       });
     }
 
@@ -67,14 +82,39 @@ class StorageService {
 
   private async syncToLocal(serverBooks: VocabularyBook[]) {
     try {
-      await db.transaction('rw', db.books, db.words, async () => {
-        await db.books.clear();
-        await db.words.clear();
+      // Get all local unsynced books to avoid overwriting them
+      const unsyncedBooks = await db.books.where('synced').equals(0).toArray();
+      const unsyncedIds = new Set(unsyncedBooks.map(b => b.id));
 
+      await db.transaction('rw', db.books, db.words, async () => {
         for (const book of serverBooks) {
-          await db.books.put({ id: book.id, name: book.name });
-          const wordsToPut = book.words.map(w => ({ ...w, bookId: book.id }));
+          // Skip if local has unsynced changes for this book
+          if (unsyncedIds.has(book.id)) continue;
+
+          await db.books.put({ 
+            id: book.id, 
+            name: book.name, 
+            updatedAt: book.updatedAt || Date.now(),
+            synced: 1 
+          });
+          
+          const wordsToPut = book.words.map(w => ({ 
+            ...w, 
+            bookId: book.id,
+            synced: 1,
+            updatedAt: w.updatedAt || Date.now()
+          }));
           await db.words.bulkPut(wordsToPut);
+        }
+
+        // Also remove local books that are no longer on server (unless unsynced)
+        const serverIds = new Set(serverBooks.map(b => b.id));
+        const localBooks = await db.books.toArray();
+        for (const localBook of localBooks) {
+          if (!serverIds.has(localBook.id) && localBook.synced !== 0) {
+            await db.books.delete(localBook.id);
+            await db.words.where('bookId').equals(localBook.id).delete();
+          }
         }
       });
     } catch (e) {
@@ -83,11 +123,24 @@ class StorageService {
   }
 
   async saveBook(book: VocabularyBook): Promise<void> {
+    const now = Date.now();
+    const bookWithMeta = { ...book, updatedAt: now, synced: 0 };
+
     // Save to local first (always available)
     try {
       await db.transaction('rw', db.books, db.words, async () => {
-        await db.books.put({ id: book.id, name: book.name });
-        const wordsToPut = book.words.map(w => ({ ...w, bookId: book.id }));
+        await db.books.put({ 
+          id: bookWithMeta.id, 
+          name: bookWithMeta.name, 
+          updatedAt: now, 
+          synced: 0 
+        });
+        const wordsToPut = bookWithMeta.words.map(w => ({ 
+          ...w, 
+          bookId: bookWithMeta.id,
+          updatedAt: w.updatedAt || now,
+          synced: 0
+        }));
         await db.words.bulkPut(wordsToPut);
       });
     } catch (e) {
@@ -95,51 +148,77 @@ class StorageService {
     }
 
     // Then try server
+    if (this.isOnline) {
+      await this.pushBookToServer(bookWithMeta);
+    }
+  }
+
+  private async pushBookToServer(book: VocabularyBook): Promise<boolean> {
     try {
-      if (this.isOnline) {
-        await fetch('/api/books', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(book)
+      const res = await fetch('/api/books', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(book)
+      });
+      
+      if (res.ok) {
+        // Mark as synced locally
+        await db.transaction('rw', db.books, db.words, async () => {
+          await db.books.update(book.id, { synced: 1 });
+          await db.words.where('bookId').equals(book.id).modify({ synced: 1 });
         });
+        return true;
       }
     } catch (e) {
-      console.warn("Failed to save book to server, will sync later", e);
+      console.warn(`Failed to push book ${book.id} to server`, e);
+    }
+    return false;
+  }
+
+  async syncPendingChanges() {
+    if (this.syncInProgress || !this.isOnline) return;
+    this.syncInProgress = true;
+
+    try {
+      const pendingBooks = await db.books.where('synced').equals(0).toArray();
+      console.log(`Syncing ${pendingBooks.length} pending books...`);
+      
+      for (const bookMeta of pendingBooks) {
+        const words = await db.words.where('bookId').equals(bookMeta.id).toArray();
+        const fullBook: VocabularyBook = {
+          ...bookMeta,
+          words: words.map(({ bookId, synced, ...rest }) => rest as Word)
+        };
+        await this.pushBookToServer(fullBook);
+      }
+    } catch (e) {
+      console.error("Background sync failed", e);
+    } finally {
+      this.syncInProgress = false;
     }
   }
 
   async updateWord(bookId: string, word: Word): Promise<void> {
+    const now = Date.now();
+    const wordWithMeta = { ...word, updatedAt: now, synced: 0 };
+
     // Update local
     try {
-      await db.words.put({ ...word, bookId });
+      await db.transaction('rw', db.books, db.words, async () => {
+        await db.words.put({ ...wordWithMeta, bookId });
+        await db.books.update(bookId, { synced: 0, updatedAt: now });
+      });
     } catch (e) {
       console.error("Failed to update word in local DB", e);
     }
 
-    // Update server (currently we save the whole book, so we need to get the book first)
-    // This is a bit inefficient but matches current backend. 
-    // In a real app, we'd have a specific updateWord API.
-    try {
-      if (this.isOnline) {
-        const res = await fetch(`/api/books?t=${Date.now()}`);
-        if (res.ok) {
-          const books: VocabularyBook[] = await res.json();
-          const bookIndex = books.findIndex(b => b.id === bookId);
-          if (bookIndex !== -1) {
-            const wordIndex = books[bookIndex].words.findIndex(w => w.id === word.id);
-            if (wordIndex !== -1) {
-              books[bookIndex].words[wordIndex] = word;
-              await fetch('/api/books', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(books[bookIndex])
-              });
-            }
-          }
-        }
+    // If online, push the whole book (current server limitation)
+    if (this.isOnline) {
+      const books = await this.getLocalBooks();
+      const book = books.find(b => b.id === bookId);
+      if (book) {
+        await this.pushBookToServer(book);
       }
-    } catch (e) {
-      console.warn("Failed to update word on server", e);
     }
   }
 
@@ -155,12 +234,12 @@ class StorageService {
     }
 
     // Delete server
-    try {
-      if (this.isOnline) {
+    if (this.isOnline) {
+      try {
         await fetch(`/api/books?id=${bookId}`, { method: 'DELETE' });
+      } catch (e) {
+        console.warn("Failed to delete book from server", e);
       }
-    } catch (e) {
-      console.warn("Failed to delete book from server", e);
     }
   }
 
@@ -177,12 +256,12 @@ class StorageService {
     }
 
     // Clear server
-    try {
-      if (this.isOnline) {
+    if (this.isOnline) {
+      try {
         await fetch('/api/books', { method: 'DELETE' });
+      } catch (e) {
+        console.warn("Failed to clear server data", e);
       }
-    } catch (e) {
-      console.warn("Failed to clear server data", e);
     }
   }
 }
