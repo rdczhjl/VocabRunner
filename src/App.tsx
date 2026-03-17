@@ -1026,6 +1026,8 @@ export default function App() {
                   'text-red-600 bg-red-50'
                 }`}
                 autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
                 spellCheck="false"
                 disabled={testFeedback === 'correct'}
               />
