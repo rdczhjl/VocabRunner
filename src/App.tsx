@@ -101,10 +101,13 @@ export default function App() {
         
         let booksToSet = initialBooks;
 
-        // Ensure the default sample book is always present if no books were loaded
-        const hasSampleBook = booksToSet.some(b => b.id === defaultSampleBook.id);
-        if (!hasSampleBook) {
-          booksToSet = [defaultSampleBook, ...booksToSet];
+        // Ensure the default sample book is always present and has words
+        const existingSampleBook = booksToSet.find(b => b.id === defaultSampleBook.id);
+        const hasSampleBookWithWords = existingSampleBook && existingSampleBook.words && existingSampleBook.words.length > 0;
+        
+        if (!hasSampleBookWithWords) {
+          // If it doesn't exist or is empty, add/replace it with the full default sample book
+          booksToSet = [defaultSampleBook, ...booksToSet.filter(b => b.id !== defaultSampleBook.id)];
           // Save the sample book so it persists
           storageService.saveBook(defaultSampleBook);
         }
@@ -165,20 +168,20 @@ export default function App() {
   const currentBook = books.find(b => b.id === currentBookId) || null;
 
   // Calculate stats for the current book
-  const totalWords = currentBook?.words.length || 0;
-  const learnedWords = currentBook?.words.filter(w => w.isLearned).length || 0;
-  const passedWords = currentBook?.words.filter(w => w.testStatus === 'mastered').length || 0;
+  const totalWords = currentBook?.words?.length || 0;
+  const learnedWords = currentBook?.words?.filter(w => w.isLearned).length || 0;
+  const passedWords = currentBook?.words?.filter(w => w.testStatus === 'mastered').length || 0;
 
   // Generate word cloud words (up to 20 words, matching test selection criteria)
   const wordCloudWords = useMemo(() => {
-    if (!currentBook) return [];
+    if (!currentBook || !currentBook.words || currentBook.words.length === 0) return [];
     
     const targetSize = 20;
     const halfSize = Math.floor(targetSize / 2);
     
-    // 1. Recently learned words
+    // 1. Recently learned words (learned but not yet mastered)
     const recentlyLearned = [...currentBook.words]
-      .filter(w => w.isLearned)
+      .filter(w => w.isLearned && w.testStatus !== 'mastered')
       .sort((a, b) => {
         const timeA = a.lastLearnedAt ? new Date(a.lastLearnedAt).getTime() : 0;
         const timeB = b.lastLearnedAt ? new Date(b.lastLearnedAt).getTime() : 0;
@@ -446,7 +449,7 @@ export default function App() {
 
   // --- Learning Logic ---
   const startLearning = () => {
-    if (!currentBook) return;
+    if (!currentBook || !currentBook.words) return;
     
     // Select unlearned words first
     let unlearned = currentBook.words.filter(w => !w.isLearned);
@@ -480,7 +483,7 @@ export default function App() {
   };
 
   const markAsLearned = () => {
-    if (!currentBook) return;
+    if (!currentBook || !currentBook.words) return;
     
     const currentWord = sessionWords[currentIndex];
     const now = new Date().toISOString();
@@ -504,13 +507,13 @@ export default function App() {
 
   // --- Testing Logic ---
   const startTesting = () => {
-    if (!currentBook) return;
+    if (!currentBook || !currentBook.words) return;
     
     const halfSize = Math.floor(batchSize / 2);
     
-    // 1. Recently learned words (isLearned === true)
+    // 1. Recently learned words (learned but not yet mastered)
     const recentlyLearned = [...currentBook.words]
-      .filter(w => w.isLearned)
+      .filter(w => w.isLearned && w.testStatus !== 'mastered')
       .sort((a, b) => {
         const timeA = a.lastLearnedAt ? new Date(a.lastLearnedAt).getTime() : 0;
         const timeB = b.lastLearnedAt ? new Date(b.lastLearnedAt).getTime() : 0;
@@ -607,7 +610,7 @@ export default function App() {
 
   const updateWordTestStatus = (wordId: string, isSuccess: boolean) => {
     const bookToUpdate = books.find(b => b.id === currentBookId);
-    if (!bookToUpdate) return;
+    if (!bookToUpdate || !bookToUpdate.words) return;
 
     const now = new Date().toISOString();
     let updatedWord: Word | null = null;
