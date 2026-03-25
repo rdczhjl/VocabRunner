@@ -583,7 +583,10 @@ export default function App() {
     if (!currentBook || !testInput.trim()) return;
     
     const currentWord = sessionWords[currentIndex];
-    const isCorrect = testInput.trim().toLowerCase() === currentWord.word.toLowerCase();
+    // Ignore spaces, punctuation and case
+    const normalizedInput = testInput.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const normalizedTarget = currentWord.word.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    const isCorrect = normalizedInput === normalizedTarget;
     
     if (isCorrect) {
       setTestFeedback('correct');
