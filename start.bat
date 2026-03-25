@@ -1,7 +1,7 @@
 @echo off
 title VocabRunner Startup
 echo ========================================
-echo   VocabRunner 3.18 - Starting...
+echo   VocabRunner 4.5 - Starting...
 echo ========================================
 
 :: Check for node_modules

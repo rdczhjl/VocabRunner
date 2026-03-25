@@ -1,4 +1,4 @@
-# VocabRunner 设计文档 (v4.2)
+# VocabRunner 设计文档 (v4.5)
 
 本文档详细说明了 VocabRunner 单词学习应用的核心逻辑与设计规范。
 
