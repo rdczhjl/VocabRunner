@@ -77,6 +77,7 @@ export default function App() {
   const [serverIp, setServerIp] = useState<string>('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [wrongAttempts, setWrongAttempts] = useState<number>(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -572,6 +573,7 @@ export default function App() {
     setCurrentIndex(0);
     setTestInput('');
     setTestFeedback('none');
+    setWrongAttempts(0);
     setShowHint(settings.showPhoneticInTest);
     setCurrentScreen('testing');
     
@@ -590,6 +592,7 @@ export default function App() {
     
     if (isCorrect) {
       setTestFeedback('correct');
+      setWrongAttempts(0);
       // Update status
       updateWordTestStatus(currentWord.id, true);
       
@@ -602,6 +605,7 @@ export default function App() {
       }, 1000); // Slightly longer delay to hear the pronunciation
     } else {
       setTestFeedback('incorrect');
+      setWrongAttempts(prev => prev + 1);
       setShowHint(true); // Show phonetic hint if they get it wrong
       // Update status
       updateWordTestStatus(currentWord.id, false);
@@ -667,6 +671,7 @@ export default function App() {
       setCurrentIndex(nextIndex);
       setTestInput('');
       setTestFeedback('none');
+      setWrongAttempts(0);
       setShowHint(settings.showPhoneticInTest);
       
       // Auto-pronounce in learning mode
@@ -1004,15 +1009,36 @@ export default function App() {
                 <h2 className="text-4xl md:text-5xl font-bold text-gray-800">{currentWord.meaning}</h2>
               </div>
               
-              {showHint && (
-                <div className="flex items-center justify-center gap-3 text-indigo-500 text-2xl font-bold clay-card py-4 px-8 inline-flex">
-                  <span>{currentWord.phonetic}</span>
-                  <button 
-                    onClick={() => speakWord(currentWord.word)}
-                    className="p-2 clay-btn-white"
-                  >
-                    <Volume2 size={24} />
-                  </button>
+              {(showHint || wrongAttempts >= 3) && (
+                <div className="flex flex-col items-center gap-4 w-full">
+                  <div className="flex items-center justify-center gap-3 text-indigo-500 text-2xl font-bold clay-card py-4 px-8 inline-flex">
+                    <span>{currentWord.phonetic}</span>
+                    <button 
+                      onClick={() => speakWord(currentWord.word)}
+                      className="p-2 clay-btn-white"
+                    >
+                      <Volume2 size={24} />
+                    </button>
+                  </div>
+                  
+                  {wrongAttempts >= 3 && (
+                    <div className="clay-card p-10 bg-indigo-50 border-indigo-200 animate-in fade-in slide-in-from-top-2 duration-300 w-full text-left space-y-6">
+                      <div>
+                        <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-1">Correct Word</h4>
+                        <p className="text-4xl font-bold text-indigo-800 tracking-tight">{currentWord.word}</p>
+                      </div>
+                      {currentWord.sentence && (
+                        <div>
+                          <h4 className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-1">Example</h4>
+                          <p className="text-xl text-indigo-600 italic font-medium">"{currentWord.sentence}"</p>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-amber-600 font-bold bg-amber-50 p-4 rounded-2xl border border-amber-100">
+                        <X size={20} />
+                        <span>Maximum attempts reached. Please skip and review.</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1024,8 +1050,8 @@ export default function App() {
                 type="text"
                 value={testInput}
                 onChange={(e) => setTestInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type the English word..."
+                onKeyDown={wrongAttempts >= 3 ? undefined : handleKeyDown}
+                placeholder={wrongAttempts >= 3 ? "Attempts exceeded" : "Type the English word..."}
                 className={`w-full text-center text-4xl font-bold p-8 clay-card outline-none transition-all ${
                   testFeedback === 'none' ? 'text-gray-900' :
                   testFeedback === 'correct' ? 'text-emerald-600 bg-emerald-50' :
@@ -1035,18 +1061,18 @@ export default function App() {
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck="false"
-                disabled={testFeedback === 'correct'}
+                disabled={testFeedback === 'correct' || wrongAttempts >= 3}
               />
               
               {/* Feedback Icons */}
               <div className="absolute right-6 top-1/2 -translate-y-1/2">
                 {testFeedback === 'correct' && <CheckCircle2 className="text-emerald-500" size={48} />}
-                {testFeedback === 'incorrect' && <X className="text-red-500" size={48} />}
+                {(testFeedback === 'incorrect' || wrongAttempts >= 3) && <X className="text-red-500" size={48} />}
               </div>
             </div>
 
             {/* Incorrect Feedback Message */}
-            {testFeedback === 'incorrect' && (
+            {testFeedback === 'incorrect' && wrongAttempts < 3 && (
               <div className="text-red-500 font-bold text-xl animate-bounce">
                 Incorrect. Try again or skip.
               </div>
@@ -1057,13 +1083,15 @@ export default function App() {
         <footer className="p-8 border-t border-gray-100 bg-gray-50/50 flex gap-6">
           <button 
             onClick={skipTestWord}
-            className="flex-1 py-5 clay-btn-white font-bold text-xl active:scale-95"
+            className={`flex-1 py-5 font-bold text-xl active:scale-95 ${
+              wrongAttempts >= 3 ? 'clay-btn-indigo animate-pulse' : 'clay-btn-white'
+            }`}
           >
             Skip
           </button>
           <button 
             onClick={testFeedback === 'incorrect' ? () => { setTestInput(''); setTestFeedback('none'); inputRef.current?.focus(); } : checkAnswer}
-            disabled={!testInput.trim() || testFeedback === 'correct'}
+            disabled={!testInput.trim() || testFeedback === 'correct' || wrongAttempts >= 3}
             className={`flex-[2] py-5 font-bold text-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
               testFeedback === 'incorrect' 
                 ? 'clay-btn-indigo' 

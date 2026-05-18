@@ -2,7 +2,7 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# VocabRunner 4.5
+# VocabRunner 4.6
 
 A powerful vocabulary learning app with offline support and cloud sync.
 
@@ -117,6 +117,33 @@ View your app in AI Studio: https://ai.studio/apps/a8637214-5338-49ff-835c-3c668
 *   是否使用了 HTTPS 访问？（HTTP 无法离线）
 *   是否在 iOS 上开启了“完全信任”根证书？
 *   是否在有网时完整打开过一次应用（让 Service Worker 完成资源抓取）？
+
+---
+
+## （4）版本升级步骤 (Version Upgrade Guide)
+
+当 VocabRunner 发布新版本时，您可以按照以下步骤进行升级，同时保留现有的单词本、进度和 SSL 证书。
+
+### 1. 备份数据（关键）
+在升级前，请手动复制并备份以下文件夹和文件：
+*   **`books/` 文件夹**：包含您所有的单词本、学习记录和进度（`.json` 文件）。
+*   **`cert.pem` 和 `key.pem`**：您的 HTTPS 站点证书文件。
+*   **`rootCA.pem`** (如果存在)：您的本地根证书。
+
+### 2. 获取新版本代码
+*   **Git 用户**：直接运行 `git pull`。
+*   **手动部署用户**：
+    1. 下载新版本的压缩包并解压。
+    2. 将备份的 `books/` 文件夹、`cert.pem` 和 `key.pem` 复制到新版本代码的根目录中，替换默认文件（如果有）。
+
+### 3. 更新依赖
+在终端进入项目根目录，运行以下命令确保所有新的库都已安装：
+```bash
+npm install
+```
+
+### 4. 重启应用
+运行 `npm run dev` (开发模式) 或您的生产环境启动命令。由于您已恢复了 `books/` 文件夹，应用会自动加载之前的并继续同步。
 
 ---
 
